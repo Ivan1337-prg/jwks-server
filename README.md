@@ -16,7 +16,7 @@
   - supertest
 ### Installation
 - To install dependencies:
-  -npm install
+  - npm install
 
 ## Run
 - npm i
