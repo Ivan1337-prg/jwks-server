@@ -14,9 +14,12 @@
   - cross-env
   - jest
   - supertest
-### Installation
+## Installation
 - To install dependencies:
   - npm install
+## Testing
+- To run tests:
+  - npm test
 
 ## Run
 - npm i
