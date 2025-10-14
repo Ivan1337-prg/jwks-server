@@ -13,7 +13,11 @@
   - express
   - cross-env
   - jest
-  - supertest 
+  - supertest
+### Installation
+- To install dependencies:
+  -npm install
+
 ## Run
 - npm i
 - npm start
