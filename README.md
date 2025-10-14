@@ -1,4 +1,6 @@
 # JWKS Server by Taras Glushko
+A simple JSON Web Key Set (JWKS) and JWT authentication server for educational testing.
+
 
 - `/jwks`: JWKS of non-expired keys
 - `/auth` (POST): JWT with `kid`
