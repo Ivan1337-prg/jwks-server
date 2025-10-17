@@ -44,9 +44,13 @@ Clone the repository and install all required packages:
 ![Test Client](screenshots/test-client.png)
 
 ### Gradebot Client 
+
 - Project 1
+  
 ![Coverage](screenshots/gradebot-coverage.png)
+
 - Project 2
+  
 ![Coverage](screenshots/gradebot-coverage2.png)
 
 ### Test Coverage
