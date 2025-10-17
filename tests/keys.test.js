@@ -1,4 +1,4 @@
-//tests key helpers for active, expired, and edge cases
+// tests key helpers (active/expired/edge-cases)
 import {
   initializeKeys,
   getActivePublicJwks,
@@ -6,9 +6,7 @@ import {
   getExpiredKey
 } from '../src/keys.js'
 
-beforeAll(async () => {
-  await initializeKeys()
-})
+beforeAll(async () => { await initializeKeys() })
 
 describe('keys helpers', () => {
   it('returns non-expired public JWKs', () => {
