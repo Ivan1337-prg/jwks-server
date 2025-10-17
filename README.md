@@ -1,31 +1,42 @@
 # JWKS Server by Taras Glushko
-A simple JSON Web Key Set (JWKS) and JWT authentication server for educational testing.
+A simple JSON Web Key Set (JWKS) and JWT authentication server built for educational testing and extended with SQLite database integration.
 
+---
 
-- `/jwks`: JWKS of non-expired keys
-- `/auth` (POST): JWT with `kid`
-- `/auth?expired=true`: JWT signed with an expired key and past `exp`
+## 🧩 Endpoints
 
-## Environment
-- Node.js version: 22.19.0
-- npm version: 10.9.3
-- Framework: Express.js
-- Dependencies:
-  - jose (for JWT)
-  - express
-  - cross-env
-  - jest
-  - supertest
-## Installation
-- To install dependencies:
-  - npm install
-## Testing
-- To run tests:
-  - npm test
+- **`/jwks`** → Returns the JWKS (JSON Web Key Set) containing all **non-expired public keys**.
+- **`/auth` (POST)** → Returns a JWT signed with a valid (unexpired) key, including its `kid`.
+- **`/auth?expired=true`** → Returns a JWT signed with an **expired key** and a past expiration timestamp (`exp`).
 
-## Run
-- npm i
-- npm start
+---
+
+## ⚙️ Environment
+
+| Component | Version / Details |
+|------------|------------------|
+| **Language** | JavaScript (Node.js) |
+| **Node.js Version** | 22.19.0 |
+| **npm Version** | 10.9.3 |
+| **Framework** | Express.js |
+| **Database (Project 2)** | SQLite (via `sqlite3` package) |
+| **JWT Library** | `jose` |
+| **Testing Frameworks** | Jest, Supertest |
+| **OS (Tested)** | Windows 11 Pro (Build 22631) |
+| **IDE** | Visual Studio Code |
+| **Port Used** | 8080 |
+
+---
+
+## 🧰 Installation & Configuration
+
+### 1️⃣ Install Dependencies
+Clone the repository and install all required packages:
+```bash
+git clone https://github.com/Ivan1337-prg/jwks-server.git
+cd jwks-server
+npm install
+
 
 ## Deliverables
 
