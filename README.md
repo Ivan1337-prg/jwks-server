@@ -33,9 +33,9 @@ A simple JSON Web Key Set (JWKS) and JWT authentication server built for educati
 ### 1️⃣ Install Dependencies
 Clone the repository and install all required packages:
 
-git clone https://github.com/Ivan1337-prg/jwks-server.git
-cd jwks-server
-npm install
+- git clone https://github.com/Ivan1337-prg/jwks-server.git
+- cd jwks-server
+- npm install
 
 
 ## Deliverables
