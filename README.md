@@ -36,6 +36,7 @@ Clone the repository and install all required packages:
 - git clone https://github.com/Ivan1337-prg/jwks-server.git
 - cd jwks-server
 - npm install
+- npm start (http://localhost:8080 -> should see 'JWKS server is running')
 
 
 ## Deliverables
