@@ -1,26 +1,31 @@
-//creates RSA keys with kid + expiry, and fetches active/expired ones
-import { randomUUID } from 'crypto'
-import { generateKeyPair, exportJWK } from 'jose'
+// Keys facade used by routes; now backed by SQLite
+import {
+  seedIfNeeded,
+  listValidRows,
+  getCurrentValidRow,
+  getOneExpiredRow,
+  rowToPublicJwk
+} from './db.js'
+import { createPrivateKey } from 'node:crypto'
 
-const store = []
-const inMins = m => new Date(Date.now() + m * 60000)
-
-export async function initializeKeys () {
-  const make = async m => {
-    const { publicKey, privateKey } = await generateKeyPair('RS256')
-    const jwk = await exportJWK(publicKey)
-    const kid = randomUUID()
-    Object.assign(jwk, { kid, alg: 'RS256', use: 'sig' })
-    store.push({ kid, privateKey, publicJwk: jwk, expiresAt: inMins(m) })
-  }
-  await Promise.all([make(60), make(-10)])
+export async function initializeKeys() {
+  seedIfNeeded()
 }
 
-export const getActivePublicJwks = () =>
-  store.filter(k => k.expiresAt > new Date()).map(k => k.publicJwk)
+export async function getActivePublicJwks() {
+  const rows = listValidRows()
+  const jwks = await Promise.all(rows.map(rowToPublicJwk))
+  return jwks
+}
 
-export const getCurrentSigningKey = () =>
-  store.filter(k => k.expiresAt > new Date()).sort((a, b) => b.expiresAt - a.expiresAt)[0] || null
+export function getCurrentSigningKey() {
+  const row = getCurrentValidRow()
+  if (!row) return null
+  return { kid: String(row.kid), privateKey: createPrivateKey(row.key.toString()) }
+}
 
-export const getExpiredKey = () =>
-  store.find(k => k.expiresAt <= new Date()) || null
+export function getExpiredKey() {
+  const row = getOneExpiredRow()
+  if (!row) return null
+  return { kid: String(row.kid), privateKey: createPrivateKey(row.key.toString()) }
+}
