@@ -46,11 +46,13 @@ Clone the repository and install all required packages:
 
 ### Gradebot Client 
 
-- Project 1
+**Project 1**
+- D:\gradebotUNT\gradebot project1 --port=8080
   
 ![Coverage](screenshots/gradebot-coverage.png)
 
-- Project 2
+**Project 2**
+- D:\gradebotUNT\gradebot project2 --port=8080
   
 ![Coverage](screenshots/gradebot-coverage2.png)
 
