@@ -3,7 +3,7 @@ A simple JSON Web Key Set (JWKS) and JWT authentication server built for educati
 
 ---
 
-## 🧩 Endpoints
+##  Endpoints
 
 - **`/jwks`** → Returns the JWKS (JSON Web Key Set) containing all **non-expired public keys**.
 - **`/auth` (POST)** → Returns a JWT signed with a valid (unexpired) key, including its `kid`.
@@ -11,7 +11,7 @@ A simple JSON Web Key Set (JWKS) and JWT authentication server built for educati
 
 ---
 
-## ⚙️ Environment
+##  Environment
 
 | Component | Version / Details |
 |------------|------------------|
@@ -28,7 +28,7 @@ A simple JSON Web Key Set (JWKS) and JWT authentication server built for educati
 
 ---
 
-## 🧰 Installation & Configuration
+##  Installation & Configuration
 
 Clone the repository and install all required packages:
 
