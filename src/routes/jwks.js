@@ -1,15 +1,12 @@
-// /.well-known/jwks.json route.
-import express from 'express';
-import { getAllValidPublicJwks } from '../db.js';
+// src/routes/jwks.js
+import express from "express";
+import { getActivePublicJwks } from "../keys.js";
 
-const r = express.Router();
+const router = express.Router();
 
-// Gradebot requires EXACT path:
-r.get('/.well-known/jwks.json', (req, res) => {
-  const rows = getAllValidPublicJwks.all();
-  // rows are text; convert to objects:
-  const keys = rows.map(r => JSON.parse(r.public_jwk));
+router.get("/.well-known/jwks.json", (req, res) => {
+  const keys = getActivePublicJwks();
   res.json({ keys });
 });
 
-export default r;
+export default router;

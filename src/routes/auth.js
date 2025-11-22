@@ -1,60 +1,52 @@
-import { decryptPrivateKey } from '../crypto.js';
-import express from 'express';
-import { SignJWT } from 'jose';
-import { getNewestValidKey, getExpiredKey, getUserByUsername, insertAuthLog } from '../db.js';
-import { createPrivateKey } from 'node:crypto';
+// src/routes/auth.js
+import express from "express";
+import { signJwt } from "../keys.js";
+import { getUserByUsername, insertAuthLog } from "../db.js";
 
+const router = express.Router();
 
-const r = express.Router();
+// --- simple in-memory rate limiter: 10 / second -------------------
+const WINDOW_MS = 1000;
+const MAX_REQUESTS = 10;
+let timestamps = [];
 
-/**
- * POST /auth
- * Basic auth: username / password
- * Query: ?expired=true → use expired key
- */
-r.post('/auth', async (req, res) => {
-    const useExpired = req.query.expired === "true";
+router.post("/auth", async (req, res) => {
+  const now = Date.now();
+  timestamps = timestamps.filter((t) => now - t < WINDOW_MS);
+  if (timestamps.length >= MAX_REQUESTS) {
+    // optional requirement: 429 Too Many Requests
+    return res.status(429).send("Too Many Requests");
+  }
+  timestamps.push(now);
 
-    // ---- mock auth (per project instructions) ----
-    const authHeader = req.headers.authorization || "";
-    const encoded = authHeader.replace("Basic ", "");
-    const [username] = Buffer.from(encoded, "base64").toString().split(":");
+  const expired = req.query.expired === "true";
 
-    let user = null;
-    try {
-        user = getUserByUsername.get(username);
-    } catch (e) {}
+  // Basic auth parsing (still just mocked auth)
+  let username = "userABC";
 
-    // ---- select key ----
-    const keyRow = useExpired ? getExpiredKey.get() : getNewestValidKey.get();
-    if (!keyRow) return res.status(500).json({ error: "no keys in database" });
+  const header = req.headers.authorization || "";
+  if (header.startsWith("Basic ")) {
+    const decoded = Buffer.from(header.slice(6), "base64").toString("utf8");
+    const [u] = decoded.split(":");
+    if (u) username = u;
+  }
 
-    // decrypt RSA private key
-    const privPem = decryptPrivateKey(
-        keyRow.priv,
-        keyRow.iv,
-        keyRow.tag
-    );
+  try {
+    const token = await signJwt({ username, expired });
 
-    // sign JWT
-    const jwt = await new SignJWT({ user })
-        .setProtectedHeader({ alg: "RS256", kid: keyRow.kid })
-        .setExpirationTime(Math.floor(Date.now() / 1000) + 3600)
-        .sign(await importPrivateKey(privPem));
-
-    // log request (user_id may be null)
+    // Only successful requests are logged
+    const user = getUserByUsername.get(username);
     insertAuthLog.run({
-        request_ip: req.ip,
-        user_id: user?.id ?? null
+      request_ip: req.ip || req.socket.remoteAddress || "",
+      user_id: user ? user.id : null
     });
 
-    return res.json({ token: jwt });
+    // project 1/2 client expects raw JWT body
+    res.send(token);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "failed to sign JWT" });
+  }
 });
 
-async function importPrivateKey(pem) {
-    return createPrivateKey({ key: pem, format: "pem" }).export({
-        format: "jwk"
-    });
-}
-
-export default r;
+export default router;

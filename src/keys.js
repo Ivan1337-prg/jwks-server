@@ -1,82 +1,88 @@
-import { generateKeyPairSync, createPublicKey } from 'node:crypto';
-import { insertKey, getNewestValidKey as dbGetNewestValidKey, getExpiredKey as dbGetExpiredKey, getAllValidPublicJwks as dbGetAllValidPublicJwks } from './db.js';
-import { encryptPrivateKey } from './crypto.js';
+// src/keys.js
+import crypto from "node:crypto";
+import {
+  generateKeyPair,
+  exportJWK,
+  exportPKCS8,
+  importPKCS8,
+  SignJWT
+} from "jose";
+
+import {
+  db,
+  insertKey,
+  getNewestValidKey,
+  getExpiredKey,
+  getAllValidPublicJwks
+} from "./db.js";
+import { encryptPrivateKey, decryptPrivateKey } from "./crypto.js";
+
+async function createAndStoreKeyPair(secondsFromNow) {
+  const { publicKey, privateKey } = await generateKeyPair("RS256", {
+    modulusLength: 2048
+  });
+
+  const now = Math.floor(Date.now() / 1000);
+  const exp = now + secondsFromNow;
+  const kid = crypto.randomUUID();
+
+  const publicJwk = await exportJWK(publicKey);
+  publicJwk.kid = kid;
+  publicJwk.use = "sig";
+  publicJwk.alg = "RS256";
+
+  const privPem = await exportPKCS8(privateKey);
+  const { priv, iv, tag } = encryptPrivateKey(privPem);
+
+  insertKey.run({
+    kid,
+    priv,
+    iv,
+    tag,
+    exp,
+    public_jwk: JSON.stringify(publicJwk)
+  });
+}
 
 export async function initializeKeys() {
-    const now = Math.floor(Date.now() / 1000);
-    const expiresSoon = now + 3600;   // valid for 1 hour
-    const expiredTime = now - 3600;   // expired 1 hour ago
+  const { c } = db.prepare("SELECT COUNT(*) AS c FROM keys").get();
+  if (c > 0) return;
 
-    generateAndStoreKey("valid-key", expiresSoon);
-    generateAndStoreKey("expired-key", expiredTime);
+  // 1 hour valid key
+  await createAndStoreKeyPair(60 * 60);
+
+  // expired key (1 minute in the past)
+  await createAndStoreKeyPair(-60);
 }
 
-// ----- helpers used by tests ----------------------------------------------
+function getKeyRow(expired) {
+  return expired ? getExpiredKey.get() : getNewestValidKey.get();
+}
+
+export async function signJwt({ username = "userABC", expired = false } = {}) {
+  const row = getKeyRow(expired);
+  if (!row) {
+    throw new Error("No signing key found in database");
+  }
+
+  const privPem = decryptPrivateKey(row.priv, row.iv, row.tag);
+  const privateKey = await importPKCS8(privPem, "RS256");
+
+  const now = Math.floor(Date.now() / 1000);
+  const exp = expired ? now - 60 : now + 60 * 60;
+
+  const token = await new SignJWT({ sub: username })
+    .setProtectedHeader({ alg: "RS256", kid: row.kid })
+    .setIssuedAt(now)
+    .setExpirationTime(exp)
+    .setIssuer("cs3550-project3")
+    .setAudience("cs3550-clients")
+    .sign(privateKey);
+
+  return token;
+}
+
 export function getActivePublicJwks() {
-    const rows = dbGetAllValidPublicJwks.all();
-    return rows.map(r => JSON.parse(r.public_jwk));
-}
-
-export function getCurrentSigningKey() {
-    const row = dbGetNewestValidKey.get();
-    if (!row) return null;
-    return {
-        kid: row.kid,
-        expiresAt: new Date(row.exp * 1000),
-        public_jwk: JSON.parse(row.public_jwk)
-    };
-}
-
-export function getExpiredKey() {
-    const row = dbGetExpiredKey.get();
-    if (!row) return null;
-    return {
-        kid: row.kid,
-        expiresAt: new Date(row.exp * 1000),
-        public_jwk: JSON.parse(row.public_jwk)
-    };
-}
-
-function generateAndStoreKey(kid, exp) {
-    const { privateKey, publicKey } = generateKeyPairSync("rsa", {
-        modulusLength: 2048,
-        publicKeyEncoding: { type: "spki", format: "pem" },
-        privateKeyEncoding: { type: "pkcs1", format: "pem" }
-    });
-
-    const { encrypted, iv, tag } = encryptPrivateKey(privateKey);
-
-    const public_jwk = JSON.stringify({
-        kty: "RSA",
-        kid,
-        alg: "RS256",
-        use: "sig",
-        ...importPublicKeyToJwk(publicKey)
-    });
-
-    insertKey.run({
-        kid,
-        priv: encrypted,
-        iv,
-        tag,
-        exp,
-        public_jwk
-    });
-}
-
-function importPublicKeyToJwk(pem) {
-    const der = Buffer.from(pem
-        .replace(/-----[^]+?-----/g, "")
-        .replace(/\s+/g, ""), "base64");
-
-    // crude JWK import (sufficient for gradebot)
-    const { n, e } = extractRsaParts(der);
-    return { n, e };
-}
-
-function extractRsaParts(der) {
-    // VERY simplified — but works for gradebot
-    // Use Node's crypto.createPublicKey (avoid the global Web Crypto `crypto`)
-    const keyObj = createPublicKey({ key: der, format: "der", type: "spki" });
-    return keyObj.export({ format: "jwk" });
+  const rows = getAllValidPublicJwks.all();
+  return rows.map((r) => JSON.parse(r.public_jwk));
 }

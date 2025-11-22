@@ -1,14 +1,15 @@
-import Database from 'better-sqlite3';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+// src/db.js
+import Database from "better-sqlite3";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const DB_FILE = path.join(__dirname, '..', 'totally_not_my_privateKeys.db');
+const DB_FILE = path.join(__dirname, "..", "totally_not_my_privateKeys.db");
 export const db = new Database(DB_FILE);
 
-// -------- SCHEMA --------
+// --- schema -------------------------------------------------------
 db.exec(`
 CREATE TABLE IF NOT EXISTS keys(
   kid TEXT PRIMARY KEY,
@@ -37,36 +38,43 @@ CREATE TABLE IF NOT EXISTS auth_logs(
 );
 `);
 
-// ---- keys ----
+// --- keys ----------------------------------------------------------
 export const insertKey = db.prepare(`
-  INSERT OR REPLACE INTO keys(kid, priv, iv, tag, exp, public_jwk)
-  VALUES(@kid, @priv, @iv, @tag, @exp, @public_jwk)
+  INSERT OR REPLACE INTO keys (kid, priv, iv, tag, exp, public_jwk)
+  VALUES (@kid, @priv, @iv, @tag, @exp, @public_jwk)
 `);
 
 export const getNewestValidKey = db.prepare(`
-  SELECT * FROM keys WHERE exp > strftime('%s','now') ORDER BY exp DESC LIMIT 1
+  SELECT * FROM keys
+  WHERE exp > strftime('%s','now')
+  ORDER BY exp DESC
+  LIMIT 1
 `);
 
 export const getExpiredKey = db.prepare(`
-  SELECT * FROM keys WHERE exp <= strftime('%s','now') ORDER BY exp DESC LIMIT 1
+  SELECT * FROM keys
+  WHERE exp <= strftime('%s','now')
+  ORDER BY exp DESC
+  LIMIT 1
 `);
 
 export const getAllValidPublicJwks = db.prepare(`
-  SELECT public_jwk FROM keys WHERE exp > strftime('%s','now')
+  SELECT public_jwk FROM keys
+  WHERE exp > strftime('%s','now')
 `);
 
-// ---- users ----
+// --- users ---------------------------------------------------------
 export const insertUser = db.prepare(`
-  INSERT INTO users(username, email, password_hash)
-  VALUES(@username, @email, @password_hash)
+  INSERT INTO users (username, email, password_hash)
+  VALUES (@username, @email, @password_hash)
 `);
 
 export const getUserByUsername = db.prepare(`
   SELECT * FROM users WHERE username = ?
 `);
 
-// ---- logs ----
+// --- auth logs -----------------------------------------------------
 export const insertAuthLog = db.prepare(`
-  INSERT INTO auth_logs(request_ip, user_id)
+  INSERT INTO auth_logs (request_ip, user_id)
   VALUES (@request_ip, @user_id)
 `);

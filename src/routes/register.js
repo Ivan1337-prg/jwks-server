@@ -1,35 +1,34 @@
-// User registration endpoint.
-import express from 'express';
-import { randomUUID } from 'node:crypto';
-import argon2 from 'argon2';
-import { insertUser } from '../db.js';
+// src/routes/register.js
+import express from "express";
+import { v4 as uuidv4 } from "uuid";
+import argon2 from "argon2";
+import { insertUser } from "../db.js";
 
-const r = express.Router();
+const router = express.Router();
 
-/**
- * POST /register
- * Body: { "username": "...", "email": "..." }
- * Response: { "password": "<generated-uuid>" }
- */
-r.post('/register', async (req, res, next) => {
+router.post("/register", async (req, res) => {
+  const { username, email } = req.body || {};
+
+  if (!username || !email) {
+    return res.status(400).json({ error: "username and email are required" });
+  }
+
+  const password = uuidv4();
+
   try {
-    const { username, email } = req.body || {};
-    if (!username) {
-      return res.status(400).json({ error: 'username is required' });
-    }
-
-    const plainPassword = randomUUID();
-    const password_hash = await argon2.hash(plainPassword);
+    const password_hash = await argon2.hash(password);
 
     insertUser.run({ username, email, password_hash });
 
-    return res.status(201).json({ password: plainPassword });
+    // OK or CREATED is fine per spec – use 201
+    res.status(201).json({ password });
   } catch (err) {
-    if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-      return res.status(409).json({ error: 'username or email already exists' });
+    if (err.code === "SQLITE_CONSTRAINT_UNIQUE") {
+      return res.status(409).json({ error: "user already exists" });
     }
-    next(err);
+    console.error(err);
+    res.status(500).json({ error: "failed to register user" });
   }
 });
 
-export default r;
+export default router;
