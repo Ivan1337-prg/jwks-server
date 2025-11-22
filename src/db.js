@@ -9,14 +9,14 @@ const __dirname = path.dirname(__filename);
 const DB_FILE = path.join(__dirname, "..", "totally_not_my_privateKeys.db");
 export const db = new Database(DB_FILE);
 
-// --- schema -------------------------------------------------------
+// --- schema ------------------------------------------------------------
 db.exec(`
 CREATE TABLE IF NOT EXISTS keys(
   kid TEXT PRIMARY KEY,
-  priv BLOB NOT NULL,
-  iv   BLOB NOT NULL,
-  tag  BLOB NOT NULL,
-  exp  INTEGER NOT NULL,
+  priv BLOB NOT NULL,          -- AES ciphertext
+  iv   BLOB NOT NULL,          -- AES IV
+  tag  BLOB NOT NULL,          -- AES GCM tag
+  exp  INTEGER NOT NULL,       -- unix seconds
   public_jwk TEXT NOT NULL
 );
 
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS auth_logs(
 );
 `);
 
-// --- keys ----------------------------------------------------------
+// --- keys helpers ------------------------------------------------------
 export const insertKey = db.prepare(`
   INSERT OR REPLACE INTO keys (kid, priv, iv, tag, exp, public_jwk)
   VALUES (@kid, @priv, @iv, @tag, @exp, @public_jwk)
@@ -63,7 +63,7 @@ export const getAllValidPublicJwks = db.prepare(`
   WHERE exp > strftime('%s','now')
 `);
 
-// --- users ---------------------------------------------------------
+// --- users -------------------------------------------------------------
 export const insertUser = db.prepare(`
   INSERT INTO users (username, email, password_hash)
   VALUES (@username, @email, @password_hash)
@@ -73,7 +73,7 @@ export const getUserByUsername = db.prepare(`
   SELECT * FROM users WHERE username = ?
 `);
 
-// --- auth logs -----------------------------------------------------
+// --- auth logs ---------------------------------------------------------
 export const insertAuthLog = db.prepare(`
   INSERT INTO auth_logs (request_ip, user_id)
   VALUES (@request_ip, @user_id)
