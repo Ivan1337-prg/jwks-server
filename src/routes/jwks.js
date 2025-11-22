@@ -1,14 +1,15 @@
-import express from 'express'
-import { getActivePublicJwks } from '../keys.js'
+// /.well-known/jwks.json route.
+import express from 'express';
+import { getAllValidPublicJwks } from '../db.js';
 
-const r = express.Router()
-const send = async (req, res) => {
-  const keys = await getActivePublicJwks()
-  res.status(200).json({ keys })
-}
+const r = express.Router();
 
-const paths = ['/.well-known/jwks.json', '/jwks']
-r.get(paths, send)
-r.all(paths, (req, res) => res.status(405).json({ error: 'Method Not Allowed' }))
+// Gradebot requires EXACT path:
+r.get('/.well-known/jwks.json', (req, res) => {
+  const rows = getAllValidPublicJwks.all();
+  // rows are text; convert to objects:
+  const keys = rows.map(r => JSON.parse(r.public_jwk));
+  res.json({ keys });
+});
 
-export default r
+export default r;

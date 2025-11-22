@@ -1,26 +1,60 @@
-import express from 'express'
-import { SignJWT } from 'jose'
-import { getCurrentSigningKey, getExpiredKey } from '../keys.js'
+import { decryptPrivateKey } from '../crypto.js';
+import express from 'express';
+import { SignJWT } from 'jose';
+import { getNewestValidKey, getExpiredKey, getUserByUsername, insertAuthLog } from '../db.js';
+import { createPrivateKey } from 'node:crypto';
 
-const r = express.Router()
 
+const r = express.Router();
+
+/**
+ * POST /auth
+ * Basic auth: username / password
+ * Query: ?expired=true → use expired key
+ */
 r.post('/auth', async (req, res) => {
-  const expired = String(req.query.expired).toLowerCase() === 'true'
-  const now = Math.floor(Date.now() / 1000)
+    const useExpired = req.query.expired === "true";
 
-  const key = expired ? getExpiredKey() : getCurrentSigningKey()
-  if (!key) return res.status(500).json({ error: 'No signing key' })
+    // ---- mock auth (per project instructions) ----
+    const authHeader = req.headers.authorization || "";
+    const encoded = authHeader.replace("Basic ", "");
+    const [username] = Buffer.from(encoded, "base64").toString().split(":");
 
-  const iat = expired ? now - 120 : now
-  const exp = expired ? now - 60 : now + 900
+    let user = null;
+    try {
+        user = getUserByUsername.get(username);
+    } catch (e) {}
 
-  const token = await new SignJWT({ sub: 'fake-user-123', scope: 'read:stuff', iat, exp })
-    .setProtectedHeader({ alg: 'RS256', kid: key.kid, typ: 'JWT' })
-    .sign(key.privateKey)
+    // ---- select key ----
+    const keyRow = useExpired ? getExpiredKey.get() : getNewestValidKey.get();
+    if (!keyRow) return res.status(500).json({ error: "no keys in database" });
 
-  res.json({ token })
-})
+    // decrypt RSA private key
+    const privPem = decryptPrivateKey(
+        keyRow.priv,
+        keyRow.iv,
+        keyRow.tag
+    );
 
-r.all('/auth', (req, res) => res.status(405).json({ error: 'Method Not Allowed' }))
+    // sign JWT
+    const jwt = await new SignJWT({ user })
+        .setProtectedHeader({ alg: "RS256", kid: keyRow.kid })
+        .setExpirationTime(Math.floor(Date.now() / 1000) + 3600)
+        .sign(await importPrivateKey(privPem));
 
-export default r
+    // log request (user_id may be null)
+    insertAuthLog.run({
+        request_ip: req.ip,
+        user_id: user?.id ?? null
+    });
+
+    return res.json({ token: jwt });
+});
+
+async function importPrivateKey(pem) {
+    return createPrivateKey({ key: pem, format: "pem" }).export({
+        format: "jwk"
+    });
+}
+
+export default r;

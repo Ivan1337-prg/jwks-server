@@ -1,81 +1,72 @@
-// SQLite layer: creates DB, seeds keys, safe queries
-import Database from 'better-sqlite3'
-import { generateKeyPairSync, createPrivateKey, createPublicKey } from 'node:crypto'
-import { exportJWK } from 'jose'
+import Database from 'better-sqlite3';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-export const DB_FILE = 'totally_not_my_privateKeys.db'
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-const db = new Database(DB_FILE)
-db.pragma('journal_mode = WAL')
+const DB_FILE = path.join(__dirname, '..', 'totally_not_my_privateKeys.db');
+export const db = new Database(DB_FILE);
 
-db.prepare(`
-  CREATE TABLE IF NOT EXISTS keys(
-    kid INTEGER PRIMARY KEY AUTOINCREMENT,
-    key BLOB NOT NULL,
-    exp INTEGER NOT NULL
-  )
-`).run()
+// -------- SCHEMA --------
+db.exec(`
+CREATE TABLE IF NOT EXISTS keys(
+  kid TEXT PRIMARY KEY,
+  priv BLOB NOT NULL,
+  iv   BLOB NOT NULL,
+  tag  BLOB NOT NULL,
+  exp  INTEGER NOT NULL,
+  public_jwk TEXT NOT NULL
+);
 
-const insertKeyStmt = db.prepare('INSERT INTO keys(key, exp) VALUES(?, ?)')
-const selectValidStmt = db.prepare('SELECT kid, key, exp FROM keys WHERE exp > ? ORDER BY exp DESC')
-const selectExpiredStmt = db.prepare('SELECT kid, key, exp FROM keys WHERE exp <= ? ORDER BY exp DESC')
-const selectCurrentStmt = db.prepare('SELECT kid, key, exp FROM keys WHERE exp > ? ORDER BY exp DESC LIMIT 1')
-const selectOneExpiredStmt = db.prepare('SELECT kid, key, exp FROM keys WHERE exp <= ? ORDER BY exp DESC LIMIT 1')
+CREATE TABLE IF NOT EXISTS users(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT NOT NULL UNIQUE,
+  email TEXT UNIQUE,
+  password_hash TEXT NOT NULL,
+  date_registered TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  last_login TIMESTAMP
+);
 
-const nowSeconds = () => Math.floor(Date.now() / 1000)
-const inMins = m => nowSeconds() + m * 60
+CREATE TABLE IF NOT EXISTS auth_logs(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  request_ip TEXT NOT NULL,
+  request_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  user_id INTEGER,
+  FOREIGN KEY(user_id) REFERENCES users(id)
+);
+`);
 
-export function insertPrivateKeyPem(pem, expSec) {
-  const info = insertKeyStmt.run(pem, expSec)
-  return info.lastInsertRowid
-}
+// ---- keys ----
+export const insertKey = db.prepare(`
+  INSERT OR REPLACE INTO keys(kid, priv, iv, tag, exp, public_jwk)
+  VALUES(@kid, @priv, @iv, @tag, @exp, @public_jwk)
+`);
 
-export function listValidRows() {
-  return selectValidStmt.all(nowSeconds())
-}
+export const getNewestValidKey = db.prepare(`
+  SELECT * FROM keys WHERE exp > strftime('%s','now') ORDER BY exp DESC LIMIT 1
+`);
 
-export function listExpiredRows() {
-  return selectExpiredStmt.all(nowSeconds())
-}
+export const getExpiredKey = db.prepare(`
+  SELECT * FROM keys WHERE exp <= strftime('%s','now') ORDER BY exp DESC LIMIT 1
+`);
 
-export function getCurrentValidRow() {
-  return selectCurrentStmt.get(nowSeconds()) || null
-}
+export const getAllValidPublicJwks = db.prepare(`
+  SELECT public_jwk FROM keys WHERE exp > strftime('%s','now')
+`);
 
-export function getOneExpiredRow() {
-  return selectOneExpiredStmt.get(nowSeconds()) || null
-}
+// ---- users ----
+export const insertUser = db.prepare(`
+  INSERT INTO users(username, email, password_hash)
+  VALUES(@username, @email, @password_hash)
+`);
 
-export async function rowToPublicJwk(row) {
-  const priv = createPrivateKey(row.key.toString())
-  const pub = createPublicKey(priv)
-  const jwk = await exportJWK(pub)
-  jwk.kid = String(row.kid)
-  jwk.alg = 'RS256'
-  jwk.use = 'sig'
-  return jwk
-}
+export const getUserByUsername = db.prepare(`
+  SELECT * FROM users WHERE username = ?
+`);
 
-// Ensure at least one expired & one valid key exist
-export function seedIfNeeded() {
-  const haveValid = listValidRows().length > 0
-  const haveExpired = listExpiredRows().length > 0
-  if (haveValid && haveExpired) return
-
-  const gen = () => generateKeyPairSync('rsa', {
-    modulusLength: 2048,
-    publicKeyEncoding: { type: 'pkcs1', format: 'pem' },
-    privateKeyEncoding: { type: 'pkcs1', format: 'pem' }
-  })
-
-  if (!haveValid) {
-    const { privateKey } = gen()
-    insertPrivateKeyPem(privateKey, inMins(60))
-  }
-  if (!haveExpired) {
-    const { privateKey } = gen()
-    insertPrivateKeyPem(privateKey, inMins(-10))
-  }
-}
-
-export default db
+// ---- logs ----
+export const insertAuthLog = db.prepare(`
+  INSERT INTO auth_logs(request_ip, user_id)
+  VALUES (@request_ip, @user_id)
+`);

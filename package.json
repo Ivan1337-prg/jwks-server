@@ -10,9 +10,13 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "better-sqlite3": "^12.4.1",
+    "argon2": "^0.44.0",
+    "better-sqlite3": "^12.4.5",
+    "dotenv": "^17.2.3",
     "express": "^4.19.2",
-    "jose": "^5.2.4"
+    "express-rate-limit": "^8.2.1",
+    "jose": "^5.2.4",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "cross-env": "^10.0.0",
