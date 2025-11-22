@@ -3,7 +3,7 @@ A simple JSON Web Key Set (JWKS) and JWT authentication server built for educati
 
 ---
 
-## 🧩 Endpoints
+##  Endpoints
 
 - **`/jwks`** → Returns the JWKS (JSON Web Key Set) containing all **non-expired public keys**.
 - **`/auth` (POST)** → Returns a JWT signed with a valid (unexpired) key, including its `kid`.
@@ -11,7 +11,7 @@ A simple JSON Web Key Set (JWKS) and JWT authentication server built for educati
 
 ---
 
-## ⚙️ Environment
+##  Environment
 
 | Component | Version / Details |
 |------------|------------------|
@@ -28,14 +28,14 @@ A simple JSON Web Key Set (JWKS) and JWT authentication server built for educati
 
 ---
 
-## 🧰 Installation & Configuration
+##  Installation & Configuration
 
-### 1️⃣ Install Dependencies
 Clone the repository and install all required packages:
 
 - git clone https://github.com/Ivan1337-prg/jwks-server.git
 - cd jwks-server
 - npm install
+- npm start (http://localhost:8080 -> should see 'JWKS server is running')
 
 
 ## Deliverables
@@ -43,7 +43,19 @@ Clone the repository and install all required packages:
 ### Test Client Output
 ![Test Client](screenshots/test-client.png)
 
+### Gradebot Client 
+
+**Project 1**
+- D:\gradebotUNT\gradebot project1 --port=8080
+  
+![Coverage](screenshots/gradebot-coverage.png)
+
+**Project 2**
+- D:\gradebotUNT\gradebot project2 --port=8080
+  
+![Coverage](screenshots/gradebot-coverage2.png)
+
 ### Test Coverage
-![Coverage](screenshots/coverage.png)
+![Coverage](screenshots/coverage1.png)
 
 
