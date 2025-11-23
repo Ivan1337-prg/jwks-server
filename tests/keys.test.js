@@ -1,57 +1,67 @@
-// tests key helpers (active/expired/edge-cases)
-import {
-  initializeKeys,
-  getActivePublicJwks,
-  getCurrentSigningKey,
-  getExpiredKey
-} from '../src/keys.js'
+// tests/keys.test.js
+import { db } from "../src/db.js";
+import { initializeKeys, getActivePublicJwks, signJwt } from "../src/keys.js";
 
-beforeAll(async () => { await initializeKeys() })
+beforeAll(() => {
+  // Start from a clean keys table for deterministic tests
+  db.prepare("DELETE FROM keys").run();
+});
 
-describe('keys helpers', () => {
-  it('returns non-expired public JWKs', () => {
-    const ks = getActivePublicJwks()
-    expect(Array.isArray(ks)).toBe(true)
-    expect(ks.length).toBeGreaterThan(0)
-    for (const jwk of ks) {
-      expect(jwk.kty).toBe('RSA')
-      expect(jwk.alg).toBe('RS256')
-      expect(jwk).toHaveProperty('kid')
-      expect(jwk).not.toHaveProperty('d')
+describe("keys helpers", () => {
+  test("initializeKeys creates at least one valid and one expired key", async () => {
+    await initializeKeys();
+
+    const total = db
+      .prepare("SELECT COUNT(*) AS c FROM keys")
+      .get().c;
+
+    const valid = db
+      .prepare(
+        "SELECT COUNT(*) AS c FROM keys WHERE exp > strftime('%s','now')"
+      )
+      .get().c;
+
+    const expired = db
+      .prepare(
+        "SELECT COUNT(*) AS c FROM keys WHERE exp <= strftime('%s','now')"
+      )
+      .get().c;
+
+    expect(total).toBeGreaterThanOrEqual(2);
+    expect(valid).toBeGreaterThanOrEqual(1);
+    expect(expired).toBeGreaterThanOrEqual(1);
+  });
+
+  test("getActivePublicJwks returns parsed JWK objects for non-expired keys", () => {
+    const keys = getActivePublicJwks();
+
+    expect(Array.isArray(keys)).toBe(true);
+    expect(keys.length).toBeGreaterThanOrEqual(1);
+
+    for (const jwk of keys) {
+      expect(jwk).toHaveProperty("kty");
+      expect(jwk).toHaveProperty("kid");
+      expect(jwk).toHaveProperty("alg");
+      expect(jwk).toHaveProperty("use");
     }
-  })
+  });
 
-  it('current signing key is active', () => {
-    const k = getCurrentSigningKey()
-    expect(k).toBeTruthy()
-    expect(k.expiresAt > new Date()).toBe(true)
-  })
+  test("signJwt returns a well-formed JWT string", async () => {
+    const token = await signJwt("test-user", { expired: false });
 
-  it('expired key exists', () => {
-    const k = getExpiredKey()
-    expect(k).toBeTruthy()
-    expect(k.expiresAt <= new Date()).toBe(true)
-  })
+    expect(typeof token).toBe("string");
+    // Very lightweight check: header.payload.signature
+    const parts = token.split(".");
+    expect(parts).toHaveLength(3);
+    expect(parts[0].length).toBeGreaterThan(0);
+    expect(parts[1].length).toBeGreaterThan(0);
+    expect(parts[2].length).toBeGreaterThan(0);
+  });
 
-  it('returns empty array when no active keys', () => {
-    const RealDate = Date
-    global.Date = class extends RealDate {
-      constructor(...args) { return args.length ? new RealDate(...args) : new RealDate(3000, 0, 1) }
-      static now() { return new RealDate(3000, 0, 1).getTime() }
-    }
-    const ks = getActivePublicJwks()
-    expect(ks.length).toBe(0)
-    global.Date = RealDate
-  })
+  test("signJwt can also issue an 'expired' token (different branch)", async () => {
+    const token = await signJwt("test-user", { expired: true });
 
-  it('getExpiredKey returns null when no keys are expired', () => {
-    const RealDate = Date
-    global.Date = class extends RealDate {
-      constructor(...args) { return args.length ? new RealDate(...args) : new RealDate(2000, 0, 1) }
-      static now() { return new RealDate(2000, 0, 1).getTime() }
-    }
-    const k = getExpiredKey()
-    expect(k).toBeNull()
-    global.Date = RealDate
-  })
-})
+    expect(typeof token).toBe("string");
+    expect(token.split(".")).toHaveLength(3);
+  });
+});

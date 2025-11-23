@@ -1,4 +1,3 @@
-// src/server.js
 import "dotenv/config";
 import express from "express";
 import jwksRoutes from "./routes/jwks.js";
@@ -16,7 +15,7 @@ app.use(registerRoutes);
 app.get("/", (req, res) => res.status(200).send("JWKS Server running"));
 
 app.use((req, res) => {
-  res.status(404).json({ error: "Not Found" });
+  return res.status(404).json({ error: "Not Found" });
 });
 
 const PORT = process.env.PORT || 8080;

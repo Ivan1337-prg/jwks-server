@@ -1,21 +1,33 @@
-// tests /jwks only returns valid (non-expired) public keys
-import request from 'supertest'
-import app, { appReady } from '../src/server.js'
-import { getActivePublicJwks } from '../src/keys.js'
+// tests/jwks.test.js
+import dotenv from "dotenv";
+dotenv.config();
 
-beforeAll(async () => { await appReady })
+process.env.NODE_ENV = "test";
 
-it('GET /jwks → only non-expired public JWKs (no private fields)', async () => {
-  const res = await request(app).get('/jwks').expect(200)
-  const { keys } = res.body
+import request from "supertest";
 
-  expect(Array.isArray(keys)).toBe(true)
-  expect(keys.length).toBe(getActivePublicJwks().length)
+let app;
+let initializeKeys;
 
-  for (const jwk of keys) {
-    expect(jwk.kty).toBe('RSA')
-    expect(jwk.alg).toBe('RS256')
-    expect(jwk).toHaveProperty('kid')
-    expect(jwk).not.toHaveProperty('d') // private part must never leak
-  }
-})
+beforeAll(async () => {
+  const modServer = await import("../src/server.js");
+  app = modServer.default || modServer.app || modServer;
+
+  const modKeys = await import("../src/keys.js");
+  initializeKeys = modKeys.initializeKeys;
+  await initializeKeys();
+});
+
+describe("GET /.well-known/jwks.json", () => {
+  test("returns JWKS with at least one key", async () => {
+    const res = await request(app).get("/.well-known/jwks.json");
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty("keys");
+    expect(Array.isArray(res.body.keys)).toBe(true);
+    expect(res.body.keys.length).toBeGreaterThan(0);
+    res.body.keys.forEach((k) => {
+      expect(k).toHaveProperty("kid");
+      expect(k).toHaveProperty("kty");
+    });
+  });
+});

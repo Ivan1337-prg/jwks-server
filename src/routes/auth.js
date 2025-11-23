@@ -1,55 +1,44 @@
-// src/routes/auth.js
 import express from "express";
-import { signJwtFromDb } from "../keys.js";
-import { insertAuthLog, getUserByUsername } from "../db.js";
+import { signJwt } from "../keys.js";
+import { insertAuthLog } from "../db.js";
 
 const router = express.Router();
 
-// simple in-memory rate limiter: 10 requests / second per IP
 const WINDOW_MS = 1000;
-const MAX_REQS = 10;
-const hits = new Map(); // ip -> [timestamps]
+const MAX_REQUESTS = 10;
+const buckets = new Map();
 
-function rateLimiter(req, res, next) {
+function checkRateLimit(ip) {
   const now = Date.now();
-  const ip = req.ip;
-  const prev = hits.get(ip) || [];
-  const recent = prev.filter((t) => now - t < WINDOW_MS);
+  let bucket = buckets.get(ip);
 
-  if (recent.length >= MAX_REQS) {
+  if (!bucket || now - bucket.start >= WINDOW_MS) {
+    bucket = { start: now, count: 0 };
+    buckets.set(ip, bucket);
+  }
+
+  bucket.count += 1;
+  return bucket.count <= MAX_REQUESTS;
+}
+
+router.post("/auth", async (req, res) => {
+  const ip = req.ip || req.connection?.remoteAddress || "unknown";
+
+  if (!checkRateLimit(ip)) {
     return res.status(429).json({ error: "Too Many Requests" });
   }
 
-  recent.push(now);
-  hits.set(ip, recent);
-  next();
-}
+  const expired = req.query.expired === "true";
 
-router.post("/auth", rateLimiter, async (req, res, next) => {
   try {
-    const expired = req.query.expired === "true";
-    const username = req.body?.username || "userABC";
+    const token = await signJwt(expired);
 
-    const token = await signJwtFromDb({ expired, username });
+    insertAuthLog.run({ request_ip: ip, user_id: 1 });
 
-    // --- log auth request in DB -----------------------------------------
-    let userId = null;
-    try {
-      const user = getUserByUsername.get(username);
-      if (user) userId = user.id;
-    } catch {
-      // if no user, leave userId null – rubric only checks that logs exist
-    }
-
-    insertAuthLog.run({
-      request_ip: req.ip,
-      user_id: userId
-    });
-    // --------------------------------------------------------------------
-
-    res.json({ token });
+    return res.json({ token });
   } catch (err) {
-    next(err);
+    console.error(err);
+    return res.status(500).json({ error: "Failed to issue token" });
   }
 });
 
