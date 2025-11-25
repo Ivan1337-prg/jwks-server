@@ -38,32 +38,33 @@ Clone the repository and install all required packages:
 - npm start (http://localhost:8080 -> should see 'JWKS server is running')
 
 
-## Deliverables
+# Deliverables
 
-### Test Client Output
-![Test Client](screenshots/test-client.png)
-
-### Gradebot Client 
-
-**Project 1**
+## Project 1
 - D:\gradebotUNT\gradebot project1 --port=8080
-  
+
+![Test Client](screenshots/test-client.png)
 ![Coverage](screenshots/gradebot-coverage.png)
 
-**Project 2**
+
+
+## Project 2
 - D:\gradebotUNT\gradebot project2 --port=8080
   
 ![Coverage](screenshots/gradebot-coverage2.png)
 
-### Test Coverage
+**Test Coverage**
 ![Coverage](screenshots/coverage1.png)
 
-**Project 3**
+
+
+## Project 3
 - D:\gradebotUNT\gradebot project3 --port=8080
   
 ![Coverage](screenshots/gradebot-coverage3.png)
 
-### Test Coverage
+**Test Coverage**
+
 ![Coverage](screenshots/finalCoverage.png)
 
 
