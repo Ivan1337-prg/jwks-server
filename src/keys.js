@@ -7,20 +7,26 @@ import {
   getAllValidPublicJwks,
 } from "./db.js";
 
-const NOT_MY_KEY_B64 = process.env.NOT_MY_KEY;
+let AES_KEY = null;
 
-if (!NOT_MY_KEY_B64) {
-  throw new Error("NOT_MY_KEY environment variable is required");
-}
+function getAesKey() {
+  if (AES_KEY) return AES_KEY;
+  
+  const NOT_MY_KEY_B64 = process.env.NOT_MY_KEY;
+  if (!NOT_MY_KEY_B64) {
+    throw new Error("NOT_MY_KEY environment variable is required");
+  }
 
-const AES_KEY = Buffer.from(NOT_MY_KEY_B64, "base64");
-if (AES_KEY.length !== 32) {
-  throw new Error("NOT_MY_KEY must be a 32-byte base64 string (AES-256 key)");
+  AES_KEY = Buffer.from(NOT_MY_KEY_B64, "base64");
+  if (AES_KEY.length !== 32) {
+    throw new Error("NOT_MY_KEY must be a 32-byte base64 string (AES-256 key)");
+  }
+  return AES_KEY;
 }
 
 function encryptPrivateJwk(jwk) {
   const iv = randomBytes(12); 
-  const cipher = createCipheriv("aes-256-gcm", AES_KEY, iv);
+  const cipher = createCipheriv("aes-256-gcm", getAesKey(), iv);
 
   const plaintext = Buffer.from(JSON.stringify(jwk), "utf8");
   const cipherText = Buffer.concat([cipher.update(plaintext), cipher.final()]);
@@ -30,7 +36,7 @@ function encryptPrivateJwk(jwk) {
 }
 
 function decryptPrivateJwk(row) {
-  const decipher = createDecipheriv("aes-256-gcm", AES_KEY, row.iv);
+  const decipher = createDecipheriv("aes-256-gcm", getAesKey(), row.iv);
   decipher.setAuthTag(row.tag);
 
   const plain = Buffer.concat([decipher.update(row.priv), decipher.final()]);
@@ -45,6 +51,8 @@ async function createAndStoreKey(expSeconds) {
 
   const kid = pubJwk.kid || randomBytes(8).toString("hex");
   pubJwk.kid = kid;
+  pubJwk.alg = "RS256";
+  pubJwk.use = "sig";
 
   const { priv, iv, tag } = encryptPrivateJwk(privJwk);
 
