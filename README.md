@@ -61,9 +61,9 @@ Clone the repository and install all required packages:
 **Project 3**
 - D:\gradebotUNT\gradebot project3 --port=8080
   
-![Coverage](screenshots/finalCoverage.png)
+![Coverage](screenshots/gradebot-coverage3.png)
 
 ### Test Coverage
-![Coverage](screenshots/gradebot-coverage3.png)
+![Coverage](screenshots/finalCoverage.png)
 
 
